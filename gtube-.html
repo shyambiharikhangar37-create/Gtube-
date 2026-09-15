@@ -1,1 +1,583 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gtube - Live Platform</title>
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.1"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background-color: #f9f9f9; padding-bottom: 70px; }
+        
+        /* Header */
+        header { background: #fff; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 100; }
+        .search-container { display: flex; gap: 10px; max-width: 600px; margin: 0 auto; }
+        .search-input { flex: 1; padding: 12px 20px; border: 1px solid #ddd; border-radius: 25px; outline: none; font-size: 14px; }
+        .search-btn { padding: 12px 25px; background: #ff3150; color: white; border: none; border-radius: 25px; cursor: pointer; font-weight: bold; }
+        .search-btn:hover { background: #e02b47; }
+        
+        /* Video Feed */
+        .feed { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; padding: 20px; max-width: 1200px; margin: 0 auto; }
+        .card { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s; }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        
+        /* Thumbnail */
+        .thumbnail { position: relative; background: #000; height: 180px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .play-btn { background: rgba(255, 49, 80, 0.95); border: none; color: white; font-size: 28px; width: 60px; height: 60px; border-radius: 50%; cursor: pointer; transition: transform 0.2s; }
+        .play-btn:hover { transform: scale(1.1); }
+        
+        /* Video Info */
+        .video-info { padding: 15px; }
+        .video-title { margin: 0; font-size: 16px; font-weight: 600; color: #030303; line-height: 1.4; }
+        
+        /* Action Buttons */
+        .actions { display: flex; justify-content: space-around; border-top: 1px solid #eee; padding: 10px; }
+        .action-btn { background: none; border: none; cursor: pointer; color: #606060; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 20px; transition: all 0.2s; }
+        .action-btn:hover { background: #f2f2f2; color: #ff3150; }
+        .action-btn:active { transform: scale(0.95); }
+        .action-btn.liked { color: #ff3150; }
+        .count { font-weight: 600; }
+        
+        /* Bottom Navigation */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; display: flex; justify-content: space-around; padding: 10px 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 100; }
+        .nav-btn { background: none; border: none; font-size: 12px; font-weight: 600; color: #606060; cursor: pointer; padding: 5px 15px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .nav-btn.active { color: #ff3150; }
+        .nav-icon { font-size: 20px; }
+        
+        /* Modal */
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        .modal-content { background: #fff; padding: 25px; border-radius: 16px; width: 100%; max-width: 450px; position: relative; max-height: 90vh; overflow-y: auto; }
+        .close-btn { position: absolute; top: 15px; right: 20px; background: none; border: none; font-size: 32px; cursor: pointer; color: #606060; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+        .close-btn:hover { background: #f2f2f2; }
+        
+        /* Video Player */
+        .video-player { width: 100%; border-radius: 8px; background: #000; margin-bottom: 15px; }
+        .modal-title { font-size: 18px; font-weight: 600; margin-bottom: 15px; color: #030303; }
+        
+        /* Form Elements */
+        .form-input, .form-textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; margin-bottom: 15px; font-family: inherit; }
+        .form-textarea { min-height: 100px; resize: vertical; }
+        .submit-btn { width: 100%; padding: 14px; background: #ff3150; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
+        .submit-btn:hover { background: #e02b47; }
+        .submit-btn:disabled { background: #ccc; cursor: not-allowed; }
+        
+        /* File Input */
+        .file-input { width: 100%; padding: 10px; border: 2px dashed #ddd; border-radius: 8px; margin-bottom: 15px; text-align: center; }
+        
+        /* Error/Success Messages */
+        .message { padding: 20px; text-align: center; border-radius: 8px; margin: 20px; }
+        .error { background: #ffe6e6; color: #cc0000; }
+        .success { background: #e6ffe6; color: #006600; }
+        .loading { text-align: center; padding: 40px; color: #606060; font-size: 16px; }
+        
+        /* Empty State */
+        .empty-state { text-align: center; padding: 60px 20px; color: #606060; }
+        .empty-state h3 { margin-bottom: 10px; font-size: 20px; }
+        
+        @media (max-width: 600px) {
+            .feed { grid-template-columns: 1fr; padding: 15px; }
+            .search-container { padding: 0 10px; }
+        }
+    </style>
+</head>
+<body>
 
+    <!-- Header -->
+    <header>
+        <div class="search-container">
+            <input type="text" class="search-input" id="searchInput" placeholder="वीडियो खोजें...">
+            <button class="search-btn" id="searchBtn">Search</button>
+        </div>
+    </header>
+
+    <!-- Video Feed -->
+    <main class="feed" id="videoFeed">
+        <div class="loading">⏳ वीडियो लोड हो रहे हैं...</div>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <button class="nav-btn active" onclick="showHome()">
+            <span class="nav-icon">🏠</span>
+            <span>Home</span>
+        </button>
+        <button class="nav-btn" onclick="document.getElementById('searchInput').focus()">
+            <span class="nav-icon">🔍</span>
+            <span>Search</span>
+        </button>
+        <button class="nav-btn" id="uploadNavBtn">
+            <span class="nav-icon">➕</span>
+            <span>Upload</span>
+        </button>
+        <button class="nav-btn" onclick="showGuide()">
+            <span class="nav-icon">📖</span>
+            <span>Guide</span>
+        </button>
+    </nav>
+
+    <script>
+    // Appwrite Configuration
+    const APPWRITE_CONFIG = {
+        endpoint: 'https://cloud.appwrite.io/v1',
+        projectId: '6aa2ebbf000296878b87',
+        databaseId: '6aa2ecdd0037d1cdddcd',
+        collectionId: '6aa2eea50010cef0903d',
+        bucketId: '6aa2f5a00028668aa537'
+    };
+
+    let allVideos = [];
+    let databases, storage;
+
+    // Initialize Appwrite
+    async function initAppwrite() {
+        try {
+            const { Client, Databases, Storage } = Appwrite;
+            
+            const client = new Client()
+                .setEndpoint(APPWRITE_CONFIG.endpoint)
+                .setProject(APPWRITE_CONFIG.projectId);
+            
+            databases = new Databases(client);
+            storage = new Storage(client);
+            
+            console.log('✅ Appwrite initialized successfully');
+            await loadVideos();
+        } catch (error) {
+            console.error('❌ Appwrite initialization error:', error);
+            showError('Appwrite connect करने में समस्या: ' + error.message);
+        }
+    }
+
+    // Load Videos from Database
+    async function loadVideos() {
+        const feed = document.getElementById('videoFeed');
+        
+        try {
+            console.log('📥 Loading videos...');
+            const response = await databases.listDocuments(
+                APPWRITE_CONFIG.databaseId,
+                APPWRITE_CONFIG.collectionId,
+                [Appwrite.Query.orderDesc('$createdAt')]
+            );
+            
+            allVideos = response.documents;
+            console.log(`✅ Loaded ${allVideos.length} videos`);
+            
+            if (allVideos.length === 0) {
+                showEmptyState();
+            } else {
+                renderVideos(allVideos);
+            }
+        } catch (error) {
+            console.error(' Error loading videos:', error);
+            showError('वीडियो लोड करने में समस्या: ' + error.message);
+        }
+    }
+
+    // Show Empty State
+    function showEmptyState() {
+        const feed = document.getElementById('videoFeed');
+        feed.innerHTML = `
+            <div class="empty-state">
+                <h3>📹 कोई वीडियो नहीं है</h3>
+                <p>पहला वीडियो upload करें!</p>
+                <button class="submit-btn" style="margin-top: 20px; max-width: 200px;" onclick="openUploadModal()">
+                    ➕ Upload Video
+                </button>
+            </div>
+        `;
+    }
+
+    // Show Error
+    function showError(message) {
+        const feed = document.getElementById('videoFeed');
+        feed.innerHTML = `
+            <div class="message error">
+                <strong> Error</strong><br>
+                ${message}<br><br>
+                <button onclick="location.reload()" class="submit-btn" style="max-width: 150px;">🔄 Retry</button>
+            </div>
+        `;
+    }
+
+    // Render Videos
+    function renderVideos(videos) {
+        const feed = document.getElementById('videoFeed');
+        feed.innerHTML = '';
+        
+        videos.forEach(video => {
+            const likes = video.likecount || 0;
+            const comments = video.commentcount || 0;
+            const shares = video.sharecount || 0;
+            
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <div class="thumbnail" onclick="openPlayer('${video.videoUrl}', '${escapeHtml(video.title)}')">
+                    <button class="play-btn">▶</button>
+                </div>
+                <div class="video-info">
+                    <h3 class="video-title">${escapeHtml(video.title)}</h3>
+                </div>
+                <div class="actions">
+                    <button class="action-btn like-btn" data-id="${video.$id}" data-likes="${likes}">
+                        <span>♡</span>
+                        <span class="count">${likes}</span>
+                    </button>
+                    <button class="action-btn comment-btn" data-id="${video.$id}" data-comments="${comments}">
+                        <span>💬</span>
+                        <span class="count">${comments}</span>
+                    </button>
+                    <button class="action-btn share-btn" data-id="${video.$id}" data-url="${video.videoUrl}" data-shares="${shares}">
+                        <span>🔗</span>
+                        <span class="count">${shares}</span>
+                    </button>
+                    <button class="action-btn" onclick="downloadVideo('${video.videoFILEID}', '${escapeHtml(video.title)}')">
+                        <span>📥</span>
+                        <span>Download</span>
+                    </button>
+                </div>
+            `;
+            feed.appendChild(card);
+        });
+        
+        addEventListeners();
+    }
+
+    // Add Event Listeners
+    function addEventListeners() {
+        document.querySelectorAll('.like-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => handleLike(e.currentTarget));
+        });
+        document.querySelectorAll('.comment-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => openCommentModal(e.currentTarget));
+        });
+        document.querySelectorAll('.share-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => handleShare(e.currentTarget));
+        });
+    }
+
+    // Handle Like
+    async function handleLike(btn) {
+        const videoId = btn.dataset.id;
+        const currentLikes = parseInt(btn.dataset.likes) || 0;
+        
+        if (btn.classList.contains('liked')) {
+            alert('आप पहले ही like कर चुके हैं!');
+            return;
+        }
+        
+        try {
+            btn.innerHTML = `<span>⏳</span><span class="count">...</span>`;
+            btn.disabled = true;
+            
+            await databases.updateDocument(
+                APPWRITE_CONFIG.databaseId,
+                APPWRITE_CONFIG.collectionId,
+                videoId,
+                { likecount: currentLikes + 1 }
+            );
+            
+            btn.innerHTML = `<span>❤️</span><span class="count">${currentLikes + 1}</span>`;
+            btn.classList.add('liked');
+            btn.dataset.likes = currentLikes + 1;
+            
+            const video = allVideos.find(v => v.$id === videoId);
+            if (video) video.likecount = currentLikes + 1;
+            
+        } catch (error) {
+            console.error('Like error:', error);
+            alert('Like करने में समस्या: ' + error.message);
+            btn.innerHTML = `<span>♡</span><span class="count">${currentLikes}</span>`;
+            btn.disabled = false;
+        }
+    }
+
+    // Handle Comment
+    async function openCommentModal(btn) {
+        const videoId = btn.dataset.id;
+        const currentComments = parseInt(btn.dataset.comments) || 0;
+        
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <button class="close-btn" onclick="this.closest('.modal').remove()">×</button>
+                <h3 class="modal-title">💬 कमेंट करें</h3>
+                <textarea class="form-textarea" id="commentText" placeholder="अपना कमेंट लिखें..."></textarea>
+                <button class="submit-btn" id="submitComment">Post Comment</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        document.getElementById('submitComment').addEventListener('click', async function() {
+            const text = document.getElementById('commentText').value.trim();
+            if (!text) {
+                alert('कृपया कुछ लिखें!');
+                return;
+            }
+            
+            try {
+                this.disabled = true;
+                this.textContent = '⏳ Posting...';
+                
+                await databases.updateDocument(
+                    APPWRITE_CONFIG.databaseId,
+                    APPWRITE_CONFIG.collectionId,
+                    videoId,
+                    { commentcount: currentComments + 1 }
+                );
+                
+                alert('✅ कमेंट पोस्ट हो गया!');
+                modal.remove();
+                
+                btn.innerHTML = `<span>💬</span><span class="count">${currentComments + 1}</span>`;
+                btn.dataset.comments = currentComments + 1;
+                
+                const video = allVideos.find(v => v.$id === videoId);
+                if (video) video.commentcount = currentComments + 1;
+                
+            } catch (error) {
+                console.error('Comment error:', error);
+                alert('कमेंट पोस्ट करने में समस्या: ' + error.message);
+                this.disabled = false;
+                this.textContent = 'Post Comment';
+            }
+        });
+    }
+
+    // Handle Share
+    async function handleShare(btn) {
+        const videoId = btn.dataset.id;
+        const url = btn.dataset.url;
+        const currentShares = parseInt(btn.dataset.shares) || 0;
+        
+        try {
+            let shared = false;
+            
+            if (navigator.share) {
+                try {
+                    await navigator.share({ title: 'Gtube Video', url: url });
+                    shared = true;
+                } catch (err) { console.log('Share cancelled'); }
+            }
+            
+            if (!shared) {
+                await navigator.clipboard.writeText(url);
+                alert('✅ लिंक copy हो गया!');
+                shared = true;
+            }
+            
+            if (shared) {
+                await databases.updateDocument(
+                    APPWRITE_CONFIG.databaseId,
+                    APPWRITE_CONFIG.collectionId,
+                    videoId,
+                    { sharecount: currentShares + 1 }
+                );
+                
+                btn.innerHTML = `<span>🔗</span><span class="count">${currentShares + 1}</span>`;
+                btn.dataset.shares = currentShares + 1;
+                
+                const video = allVideos.find(v => v.$id === videoId);
+                if (video) video.sharecount = currentShares + 1;
+            }
+            
+        } catch (error) {
+            console.error('Share error:', error);
+        }
+    }
+
+    // ✅ FIXED: Open Video Player with Auto-Play
+    function openPlayer(url, title) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        
+        // Added ID to video tag for easy access
+        modal.innerHTML = `
+            <div class="modal-content">
+                <button class="close-btn" onclick="closePlayer(this)">×</button>
+                <video id="playerVideo" class="video-player" controls preload="auto" playsinline>
+                    <source src="${url}" type="video/mp4">
+                    आपका browser video player को support नहीं करता।
+                </video>
+                <h3 class="modal-title">${escapeHtml(title)}</h3>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        // Auto-play the video immediately when modal opens
+        const videoElement = document.getElementById('playerVideo');
+        if (videoElement) {
+            videoElement.play().catch(error => {
+                console.log("Auto-play prevented by browser policy:", error);
+            });
+        }
+    }
+
+    // Close Player and Stop Video
+    function closePlayer(btn) {
+        const modal = btn.closest('.modal');
+        const video = modal.querySelector('video');
+        if (video) {
+            video.pause(); // Stop video so audio doesn't keep playing
+            video.src = ""; // Clear source to free memory
+        }
+        modal.remove();
+    }
+
+    // Download Video
+    async function downloadVideo(fileId, title) {
+        try {
+            const downloadUrl = storage.getFileDownload(APPWRITE_CONFIG.bucketId, fileId);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = `${title.replace(/[^a-z0-9]/gi, '_')}.mp4`;
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Download error:', error);
+            alert('Download में समस्या: ' + error.message);
+        }
+    }
+
+    // Upload Modal
+    function openUploadModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <button class="close-btn" onclick="this.closest('.modal').remove()">×</button>
+                <h3 class="modal-title">📤 Video Upload करें</h3>
+                <input type="file" class="file-input" id="videoFile" accept="video/*">
+                <input type="text" class="form-input" id="videoTitle" placeholder="Video का title लिखें...">
+                <button class="submit-btn" id="uploadSubmitBtn">Upload Now</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        document.getElementById('uploadSubmitBtn').addEventListener('click', handleUpload);
+    }
+
+    // Handle Upload
+    async function handleUpload() {
+        const fileInput = document.getElementById('videoFile');
+        const titleInput = document.getElementById('videoTitle');
+        const uploadBtn = document.getElementById('uploadSubmitBtn');
+        
+        if (!fileInput.files.length) {
+            alert('कृपया एक video select करें!');
+            return;
+        }
+        
+        if (!titleInput.value.trim()) {
+            alert('कृपया title लिखें!');
+            return;
+        }
+        
+        const file = fileInput.files[0];
+        const title = titleInput.value.trim();
+        
+        if (file.size > 100 * 1024 * 1024) {
+            alert('Video size 100MB से कम होनी चाहिए!');
+            return;
+        }
+        
+        try {
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = ' Uploading...';
+            
+            const fileResponse = await storage.createFile(
+                APPWRITE_CONFIG.bucketId,
+                Appwrite.ID.unique(),
+                file
+            );
+            
+            const videoUrl = storage.getFileView(
+                APPWRITE_CONFIG.bucketId,
+                fileResponse.$id
+            );
+            
+            await databases.createDocument(
+                APPWRITE_CONFIG.databaseId,
+                APPWRITE_CONFIG.collectionId,
+                Appwrite.ID.unique(),
+                {
+                    title: title,
+                    videoFILEID: fileResponse.$id,
+                    videoUrl: videoUrl.toString(),
+                    likecount: 0,
+                    commentcount: 0,
+                    sharecount: 0
+                }
+            );
+            
+            alert('✅ Video upload हो गया!');
+            document.querySelector('.modal').remove();
+            await loadVideos();
+            
+        } catch (error) {
+            console.error('Upload error:', error);
+            alert('Upload में समस्या: ' + error.message);
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = 'Upload Now';
+        }
+    }
+
+    // Search Functionality
+    function searchVideos() {
+        const query = document.getElementById('searchInput').value.toLowerCase().trim();
+        
+        if (!query) {
+            renderVideos(allVideos);
+            return;
+        }
+        
+        const filtered = allVideos.filter(video => 
+            video.title.toLowerCase().includes(query)
+        );
+        
+        if (filtered.length === 0) {
+            document.getElementById('videoFeed').innerHTML = `
+                <div class="empty-state">
+                    <h3>😕 कोई result नहीं मिला</h3>
+                    <p>"${escapeHtml(query)}" के लिए कोई video नहीं है</p>
+                </div>
+            `;
+        } else {
+            renderVideos(filtered);
+        }
+    }
+
+    // Utility Functions
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function showHome() {
+        document.getElementById('searchInput').value = '';
+        loadVideos();
+    }
+
+    function showGuide() {
+        alert('📖 Guide:\n\n1. Upload बटन से video upload करें\n2. Home page पर सभी videos दिखेंगी\n3. Play बटन दबाकर video देखें\n4. Like, Comment, Share कर सकते हैं\n5. Search से videos खोजें');
+    }
+
+    // Event Listeners
+    document.getElementById('searchBtn').addEventListener('click', searchVideos);
+    document.getElementById('searchInput').addEventListener('input', searchVideos);
+    
+    // Fixed Upload Button Listener
+    document.getElementById('uploadNavBtn').addEventListener('click', () => {
+        openUploadModal();
+    });
+
+    // Initialize App
+    document.addEventListener('DOMContentLoaded', initAppwrite);
+    </script>
+</body>
+</html>
